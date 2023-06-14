@@ -7,16 +7,55 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-find_package(rclcpp REQUIRED)
-find_package(sensor_msgs REQUIRED)
+
+set(dependencies 
+  rclcpp
+  rclcpp_action
+  rclcpp_components
+  sensor_msgs
+  std_msgs
+  geometry_msgs
+  builtin_interfaces
+  nav2_msgs
+)
+
+# find dependencies
+foreach(dependency ${dependencies})
+  find_package(${dependency} REQUIRED)
+endforeach()
+
+set(action_files
+  "action/Mission.action"
+)
+
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${action_files}
+  DEPENDENCIES ${dependencies}
+)
 
 add_executable(get_motor_effort src/get_motor_effort.cpp)
-ament_target_dependencies(get_motor_effort rclcpp sensor_msgs)
+ament_target_dependencies(get_motor_effort ${dependencies})
 
 add_executable(get_motor_distance src/get_motor_distance.cpp)
-ament_target_dependencies(get_motor_distance rclcpp sensor_msgs)
+ament_target_dependencies(get_motor_distance ${dependencies})
+
+ament_export_dependencies(rosidl_default_runtime)
+
+add_library(action_server SHARED
+  src/get_turtle_data.cpp)
+target_include_directories(action_server PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_definitions(action_server
+  PRIVATE "ACTION_TUTORIALS_CPP_BUILDING_DLL")
+ament_target_dependencies(action_server ${dependencies})
+rclcpp_components_register_node(action_server PLUGIN "action_get_data::GetTurtleDataServer" EXECUTABLE turtle_action_server)
+install(TARGETS
+  action_server
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
