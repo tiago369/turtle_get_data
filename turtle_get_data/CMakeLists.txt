@@ -17,22 +17,13 @@ set(dependencies
   geometry_msgs
   builtin_interfaces
   nav2_msgs
+  turtle_get_data_interfaces
 )
 
 # find dependencies
 foreach(dependency ${dependencies})
   find_package(${dependency} REQUIRED)
 endforeach()
-
-set(action_files
-  "action/Mission.action"
-)
-
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${action_files}
-  DEPENDENCIES ${dependencies}
-)
 
 add_executable(get_motor_effort src/get_motor_effort.cpp)
 ament_target_dependencies(get_motor_effort ${dependencies})
@@ -53,6 +44,21 @@ ament_target_dependencies(action_server ${dependencies})
 rclcpp_components_register_node(action_server PLUGIN "action_get_data::GetTurtleDataServer" EXECUTABLE turtle_action_server)
 install(TARGETS
   action_server
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+add_library(action_client SHARED
+  src/nav2_client.cpp)
+target_include_directories(action_client PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_definitions(action_client
+  PRIVATE "ACTION_TUTORIALS_CPP_BUILDING_DLL")
+ament_target_dependencies(action_client ${dependencies})
+rclcpp_components_register_node(action_client PLUGIN "action_get_data::Nav2Client" EXECUTABLE nav2_client)
+install(TARGETS
+  action_client
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
