@@ -5,10 +5,11 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include "rclcpp_components/register_node_macro.hpp"
-#include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "turtle_get_data_interfaces/action/mission.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include <geometry_msgs/msg/pose_stamped.hpp>
+
 
 // #include "action_tutorials_cpp/visibility_control.h"
 
@@ -17,7 +18,7 @@ namespace action_get_data
 class GetTurtleDataServer : public rclcpp::Node 
 {
     public:
-    using Action = nav2_msgs::action::NavigateToPose;
+    using Action = turtle_get_data_interfaces::action::Mission;
     using GoalHandleAction = rclcpp_action::ServerGoalHandle<Action>;
 
     explicit GetTurtleDataServer(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
@@ -37,7 +38,7 @@ class GetTurtleDataServer : public rclcpp::Node
     subscription_velocity_ = this->create_subscription<geometry_msgs::msg::Twist>(
       "/cmd_vel", 10, std::bind(&GetTurtleDataServer::velocity_callback, this, std::placeholders::_1));
 
-    publish_goal_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("send_goal", 10);
+    publish_goal_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("goal_pose", 10);
     }
     
     private:
@@ -66,7 +67,7 @@ class GetTurtleDataServer : public rclcpp::Node
 
     void execute(const std::shared_ptr<GoalHandleAction> goal_handle) {
         RCLCPP_INFO(this->get_logger(), "Executing goal");
-        // rclcpp::Rate loop_rate(1);
+        rclcpp::Rate loop_rate(1);
 
         record = 1;
         geometry_msgs::msg::PoseStamped msg;
@@ -83,6 +84,10 @@ class GetTurtleDataServer : public rclcpp::Node
         msg.pose.orientation.w = 1.0;
 
         publish_goal_->publish(msg);
+        while(rclcpp::ok()){
+            loop_rate.sleep();
+        }
+
     }
 
     void joint_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
