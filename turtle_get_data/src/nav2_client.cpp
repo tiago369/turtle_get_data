@@ -189,3 +189,5 @@ class Nav2Client : public rclcpp::Node
 
 };
 }
+
+RCLCPP_COMPONENTS_REGISTER_NODE(action_get_data::Nav2Client)
