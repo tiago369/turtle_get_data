@@ -26,26 +26,27 @@ class Nav2Client : public rclcpp::Node
     using GoalHandleAction = rclcpp_action::ClientGoalHandle<Action>;
 
     explicit Nav2Client(const rclcpp::NodeOptions & options)
-    : Node("nav2_action_client", options)
-    {
+    : Node("nav2_action_client", options) {
         this->client_ptr_ = rclcpp_action::create_client<Action>(
         this,
-        "nav2");
+        "navigate_to_pose");
 
         this->timer_ = this->create_wall_timer(
         std::chrono::milliseconds(500),
         std::bind(&Nav2Client::send_goal, this));
+        // send_goal();
 
         subscription_joint_ = this->create_subscription<sensor_msgs::msg::JointState>(
-        "/joint_state", 10, std::bind(&Nav2Client::joint_callback, this, std::placeholders::_1));
+        "/joint_states", 10, std::bind(&Nav2Client::joint_callback, this, std::placeholders::_1));
 
         subscription_velocity_ = this->create_subscription<geometry_msgs::msg::Twist>(
         "/cmd_vel", 10, std::bind(&Nav2Client::velocity_callback, this, std::placeholders::_1));
     }
 
-    void send_goal()
-    {
+    void send_goal() {
         using namespace std::placeholders;
+        
+        file_name_ = declare_parameter<std::string>("file_name", file_name_);
 
         this->timer_->cancel();
 
@@ -59,8 +60,8 @@ class Nav2Client : public rclcpp::Node
         msg.header.stamp.sec = 0;
         msg.header.stamp.nanosec = 0;
         msg.header.frame_id = "map";
-        msg.pose.position.x = 0.0;
-        msg.pose.position.y = 0.0;
+        msg.pose.position.x = 1.75;
+        msg.pose.position.y = 3.5;
         msg.pose.position.z = 0.0;
         msg.pose.orientation.x = 0.0;
         msg.pose.orientation.y = 0.0;
@@ -80,8 +81,6 @@ class Nav2Client : public rclcpp::Node
         send_goal_options.result_callback = 
         std::bind(&Nav2Client::result_callback, this, _1);
         this->client_ptr_->async_send_goal(goal_msg, send_goal_options);
-
-        
     }
 
     private:
@@ -90,10 +89,13 @@ class Nav2Client : public rclcpp::Node
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr subscription_joint_;
     std::vector<float> sum_velocities_ = {0.0f, 0.0f};
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subscription_velocity_;
+    std::string file_name_{"data.yaml"};
     rclcpp::Time initial_time, last_time;
     float sum_x_ = 0.0;
     float sum_y_ = 0.0;
     bool record = false;
+    std::vector<float> cpu_usage_;
+    bool success_ = false;
 
     void goal_response_callback(const GoalHandleAction::SharedPtr future) {
         auto goal_handle = future.get();
@@ -101,7 +103,7 @@ class Nav2Client : public rclcpp::Node
             RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
         } else {
             RCLCPP_INFO(this->get_logger(), "Goal accepted by server, waiting for result");
-            initial_time = this->now();
+            initial_time = this->get_clock()->now();
             record = true;
         }
     }
@@ -109,23 +111,26 @@ class Nav2Client : public rclcpp::Node
     void feedback_callback(
         GoalHandleAction::SharedPtr,
         const std::shared_ptr<const Action::Feedback> feedback) {
+            // Get cpu percentage use in the feedback clock
+            cpu_usage_.push_back(GetCPUUsage());
     }
 
     void result_callback(const GoalHandleAction::WrappedResult & result) {
         switch (result.code) {
         case rclcpp_action::ResultCode::SUCCEEDED:
+            success_ = true;
             break;
         case rclcpp_action::ResultCode::ABORTED:
             RCLCPP_ERROR(this->get_logger(), "Goal was aborted");
-            return;
+            break;
         case rclcpp_action::ResultCode::CANCELED:
             RCLCPP_ERROR(this->get_logger(), "Goal was canceled");
-            return;
+            break;
         default:
             RCLCPP_ERROR(this->get_logger(), "Unknown result code");
             return;
         }
-        last_time = this->now();
+        last_time = this->get_clock()->now();
         save_data();
         record = false;
         rclcpp::shutdown();
@@ -149,43 +154,66 @@ class Nav2Client : public rclcpp::Node
     }
 
     void save_data() {
-        // Create a YAML::Emitter object
-        YAML::Emitter emitter;
+        std::ofstream file(file_name_);
 
+        // See if trajectory was sucessfull
+        file << "sucess: " << success_ << std::endl;
+        
         // Add initial time (when the goal is accepted)
-        emitter << YAML::Key << "initial_time";
-        emitter << YAML::Value << initial_time.seconds();
+        file << "initial_time: " << initial_time.seconds() << std::endl;
 
         // Add last time (when revieve the result)
-        emitter << YAML::Key << "last_time";
-        emitter << YAML::Value << last_time.seconds();
+        file << "last_time: " << last_time.seconds() << std::endl;
+
+        // Add time variation
+        file << "dt: " << last_time.seconds() - initial_time.seconds() << std::endl;
 
         // Add joint effort
         // X
-        emitter << YAML::Key << "joint_effort_x";
-        emitter << YAML::Value << sum_velocities_.at(0);
+        file << "joint_effort_x: " << sum_velocities_.at(0) << std::endl;
 
         // Y
-        emitter << YAML::Key << "joint_effort_y";
-        emitter << YAML::Value << sum_velocities_.at(1);
+        file << "joint_effort_y: " << sum_velocities_.at(1) << std::endl;
 
         // Add distance
         // X
-        emitter << YAML::Key << "distance_x";
-        emitter << YAML::Value << sum_x_;
+        file << "distance_x: " << sum_x_ << std::endl;
 
         // Y
-        emitter << YAML::Key << "distance_y";
-        emitter << YAML::Value << sum_y_;
+        file << "distance_y: " << sum_y_ << std::endl;
 
-        // End emitting YAML
-        emitter << YAML::EndMap;
+        file << "test: ";
+        for (double cpu : cpu_usage_) {
+            file << cpu << ", ";
+        }
 
-        // Write YAML to file
-        std::ofstream file("data.yaml");
-        file << emitter.c_str();
+        file << std::endl;
+
         file.close();
+        std::cout << "Data saved to " << file_name_ << std::endl;
     }
+
+    // Function to measure CPU usage
+    double GetCPUUsage() {
+        // Record initial CPU time
+        auto start = std::chrono::high_resolution_clock::now();
+        auto startCPU = clock();
+
+        // Sleep for the desired time interval
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Change the duration as needed
+
+        // Record final CPU time
+        auto end = std::chrono::high_resolution_clock::now();
+        auto endCPU = clock();
+
+        // Calculate CPU usage as a percentage
+        double cpuUsage = static_cast<double>(endCPU - startCPU) / CLOCKS_PER_SEC;
+        double elapsedTime = std::chrono::duration<double>(end - start).count();
+        double cpuUsagePercentage = (cpuUsage / elapsedTime) * 100.0;
+
+        return cpuUsagePercentage;
+    }
+
 
 };
 }

@@ -18,6 +18,7 @@ set(dependencies
   builtin_interfaces
   nav2_msgs
   turtle_get_data_interfaces
+  yaml-cpp
 )
 
 # find dependencies
