@@ -60,8 +60,8 @@ class Nav2Client : public rclcpp::Node
         msg.header.stamp.sec = 0;
         msg.header.stamp.nanosec = 0;
         msg.header.frame_id = "map";
-        msg.pose.position.x = 1.75;
-        msg.pose.position.y = 3.5;
+        msg.pose.position.x = 1.4;
+        msg.pose.position.y = 0.0;
         msg.pose.position.z = 0.0;
         msg.pose.orientation.x = 0.0;
         msg.pose.orientation.y = 0.0;
