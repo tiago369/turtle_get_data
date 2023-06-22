@@ -18,7 +18,7 @@ set(dependencies
   builtin_interfaces
   nav2_msgs
   turtle_get_data_interfaces
-  yaml-cpp
+  nav2_bringup
 )
 
 # find dependencies
@@ -63,6 +63,9 @@ install(TARGETS
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
+install(DIRECTORY launch config
+DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
