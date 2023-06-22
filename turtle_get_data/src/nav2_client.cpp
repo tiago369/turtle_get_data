@@ -97,7 +97,7 @@ class Nav2Client : public rclcpp::Node
     std::vector<float> cpu_usage_;
     bool success_ = false;
 
-    void goal_response_callback(const GoalHandleAction::SharedPtr future) {
+    void goal_response_callback(const std::shared_future<GoalHandleAction::SharedPtr> future) {
         auto goal_handle = future.get();
         if (!goal_handle) {
             RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
