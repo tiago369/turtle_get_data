@@ -15,6 +15,8 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "tf2_ros/transform_listener.h"
 
 
 namespace action_get_data
@@ -41,6 +43,8 @@ class Nav2Client : public rclcpp::Node
 
         subscription_velocity_ = this->create_subscription<geometry_msgs::msg::Twist>(
         "/cmd_vel", 10, std::bind(&Nav2Client::velocity_callback, this, std::placeholders::_1));
+
+        tf_buffer_.reset(new tf2_ros::Buffer(this->get_clock()));
     }
 
     void send_goal() {
@@ -96,6 +100,10 @@ class Nav2Client : public rclcpp::Node
     bool record = false;
     std::vector<float> cpu_usage_;
     bool success_ = false;
+    // TF
+    geometry_msgs::msg::TransformStamped transform_;
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
     void goal_response_callback(const std::shared_future<GoalHandleAction::SharedPtr> future) {
         auto goal_handle = future.get();
@@ -131,11 +139,11 @@ class Nav2Client : public rclcpp::Node
             return;
         }
         last_time = this->get_clock()->now();
+        transform_ = tf_buffer_->lookupTransform("base_footprint", "map", tf2::TimePointZero);
         save_data();
         record = false;
         rclcpp::shutdown();
     }
-
 
     void joint_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
         if(record){
@@ -182,6 +190,24 @@ class Nav2Client : public rclcpp::Node
         // Y
         file << "distance_y: " << sum_y_ << std::endl;
 
+        //pose
+        file << "pose: " << std::endl;
+
+        //x
+        file << "   x: " << transform_.transform.translation.x << std::endl;
+        //y
+        file << "   y: " << transform_.transform.translation.y << std::endl;
+        //z
+        file << "   z: " << transform_.transform.translation.y << std::endl;
+        //x
+
+        //rot
+        file << "rot: " << std::endl;
+        file << "   qx: " << transform_.transform.rotation.x << std::endl;
+        file << "   qy: " << transform_.transform.rotation.y << std::endl;
+        file << "   qz: " << transform_.transform.rotation.z << std::endl;
+        file << "   qw: " << transform_.transform.rotation.w << std::endl;
+
         file << "test: ";
         for (double cpu : cpu_usage_) {
             file << cpu << ", ";
@@ -213,7 +239,6 @@ class Nav2Client : public rclcpp::Node
 
         return cpuUsagePercentage;
     }
-
 
 };
 }

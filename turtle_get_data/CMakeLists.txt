@@ -19,6 +19,8 @@ set(dependencies
   nav2_msgs
   turtle_get_data_interfaces
   nav2_bringup
+  tf2
+  tf2_ros
 )
 
 # find dependencies
