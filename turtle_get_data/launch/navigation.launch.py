@@ -1,5 +1,7 @@
 import os
-
+import launch
+import launch_ros
+import launch.actions
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -20,16 +22,22 @@ def generate_launch_description():
         default=os.path.join(
             pkg_dir,
             'config',
-            'arena1.yaml'))
+            'arena2.yaml'))
 
     param_dir = LaunchConfiguration(
-        'params_file',
+        'params_file',  
         default=os.path.join(
             pkg_dir,
             'config',
-            'dwb.yaml'))
+            'rpp.yaml'))
 
     nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
+
+    map_to_odom_publisher = launch_ros.actions.Node(
+        package='tf2_ros', executable='static_transform_publisher',
+        parameters=[{'use_sim_time': False}],
+        output='screen',
+        arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', 'map', 'odom'])
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -54,4 +62,6 @@ def generate_launch_description():
                 'use_sim_time': use_sim_time,
                 'params_file': param_dir}.items(),
         ),
+
+        # map_to_odom_publisher,
     ])

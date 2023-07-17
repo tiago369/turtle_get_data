@@ -17,6 +17,7 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
 
 
 namespace action_get_data
@@ -44,7 +45,10 @@ class Nav2Client : public rclcpp::Node
         subscription_velocity_ = this->create_subscription<geometry_msgs::msg::Twist>(
         "/cmd_vel", 10, std::bind(&Nav2Client::velocity_callback, this, std::placeholders::_1));
 
-        tf_buffer_.reset(new tf2_ros::Buffer(this->get_clock()));
+        tf_buffer_ =
+        std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ =
+        std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     }
 
     void send_goal() {
@@ -64,8 +68,8 @@ class Nav2Client : public rclcpp::Node
         msg.header.stamp.sec = 0;
         msg.header.stamp.nanosec = 0;
         msg.header.frame_id = "map";
-        msg.pose.position.x = 1.4;
-        msg.pose.position.y = 0.0;
+        msg.pose.position.x = 1.3;
+        msg.pose.position.y = 0.8;
         msg.pose.position.z = 0.0;
         msg.pose.orientation.x = 0.0;
         msg.pose.orientation.y = 0.0;
@@ -105,8 +109,7 @@ class Nav2Client : public rclcpp::Node
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-    void goal_response_callback(const std::shared_future<GoalHandleAction::SharedPtr> future) {
-        auto goal_handle = future.get();
+    void goal_response_callback(const GoalHandleAction::SharedPtr goal_handle) {
         if (!goal_handle) {
             RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
         } else {
@@ -139,7 +142,17 @@ class Nav2Client : public rclcpp::Node
             return;
         }
         last_time = this->get_clock()->now();
-        transform_ = tf_buffer_->lookupTransform("base_footprint", "map", tf2::TimePointZero);
+
+        try {
+          transform_ = tf_buffer_->lookupTransform(
+            "map", "base_footprint",
+            tf2::TimePointZero);
+        } catch (const tf2::TransformException & ex) {
+          RCLCPP_INFO(
+            this->get_logger(), "Could not transform");
+          return;
+        }
+
         save_data();
         record = false;
         rclcpp::shutdown();
